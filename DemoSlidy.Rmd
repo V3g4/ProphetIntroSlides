@@ -1,7 +1,7 @@
 ---
 title: "Introduction to Prophet in R"
-author: "Nandini Hanagud"
-date: "6/19/2017"
+author: "Nan Hanagud"
+date: "6/29/2017"
 output: slidy_presentation
 ---
 
@@ -83,7 +83,7 @@ Training Set
 ========================================================
 Create a training set - let's use 2 years so we can let it detect growth/seasonality.
 ```{r train and fit, echo=TRUE}
-df_train=df[df$ds < as.Date("2017-01-01"),]
+df_train<- df[df$ds < as.Date("2017-01-01"),]
 summary(df_train)
 ```
 
@@ -97,20 +97,22 @@ Forecast - 30 Days Forward
 ========================================================
 #### 30 Days forward
 
-```{r forecast 30, echo=TRUE}
+>     m <- prophet(df_train)
+>     future <- make_future_dataframe(m, periods=30) 
+>     forecast <- predict(m,future)
+
+```{r forecast 30, include=FALSE}
 m <- prophet(df_train)
 future <- make_future_dataframe(m, periods=30) #For a logistical growth model specify a fixed future cap
 forecast <- predict(m,future)
 ```
 
-Forecast Zoom in
-========================================================
-```{r prediction, echo=FALSE}
+```{r prediction, echo=FALSE, out.width = "600px"}
 #plot(m, forecast)
 
 ggplot()+
-  geom_line(data=filter(df, (ds>=as.Date("2017-01-01") & ds<=as.Date("2017-01-28"))), aes(x=ds, y=y, color="Actual")) +
-  geom_line(data=filter(forecast, (ds>=as.Date("2017-01-01") & ds<=as.Date("2017-01-28"))), aes(x=ds, y=yhat, color="Forecast"))
+  geom_line(data=filter(df, (ds < as.Date("2017-01-01")+29 & ds>=as.Date("2017-01-01"))), aes(x=ds, y=y, color="Actual")) +
+  geom_line(data=filter(forecast, (ds < as.Date("2017-01-01")+29 & ds>=as.Date("2017-01-01"))), aes(x=ds, y=yhat, color="Forecast"))
 
 
 ```
@@ -119,19 +121,41 @@ Forecast - 90 Days Forward
 ========================================================
 #### 90 Days forward
 
-```{r forecast 2, echo=TRUE}
+>     m <- prophet(df_train)
+>     future <- make_future_dataframe(m, periods=90) 
+>     forecast <- predict(m,future)
+
+```{r forecast 2, include=FALSE}
 m2 <- prophet(df_train)
 future2 <- make_future_dataframe(m2, periods=90)
 forecast2 <- predict(m2,future2)
 ```
 
-Forecast - Zoom In
-========================================================
 ```{r prediction 2, echo=FALSE}
 #plot(m2, forecast2)
 ggplot()+
   geom_line(data=filter(df, (ds>=as.Date("2017-01-01") & ds<=as.Date("2017-03-30"))), aes(x=ds, y=y, color="Actual")) +
   geom_line(data=filter(forecast2, (ds>=as.Date("2017-01-01") & ds<=as.Date("2017-03-30"))), aes(x=ds, y=yhat, color="Forecast"))
+```
+
+Performance with Prophet
+========================================================
+```{r, echo=FALSE}
+mape <- function(y, yhat)
+  sum(abs(y-yhat))/sum(y)
+mape30Day<-mape(filter(df,ds < as.Date("2017-01-01")+29 & ds>=as.Date("2017-01-01"))$y,tail(forecast$yhat,29))
+mape90Day<-mape(filter(df,ds < as.Date("2017-01-01")+89 & ds>=as.Date("2017-01-01"))$y,tail(forecast2$yhat,89))
+
+```
+
+* MAPE for 30 day prediction: `r mape30Day`
+* MAPE for 90 day prediction: `r mape90Day`
+
+Performance with Prophet
+========================================================
+* Performance of Prophet versus other forecasting methods ^1^
+```{r, out.width = "600px"}
+knitr::include_graphics("ProphetPerformance.png")
 ```
 
 
@@ -141,6 +165,7 @@ Forecast - Components
 ```{r echo=TRUE}
 prophet_plot_components(m, forecast)
 ```
+
 
 Trend Changepoints
 ========================================================
@@ -160,7 +185,18 @@ Control fit of model via changepoints
     + Specify number of changepoints  <font color="red">n_changepoints</font>
     + Adjust strength of prior  <font color="red">changepoint_prior_scale</font> increase to make flexible
     + Specify location of changepoints  <font color="red">changepoints</font>
+    
+```{r  include=FALSE, echo=TRUE}
+m3 <-prophet(df_train, changepoint.prior.scale = 0.1)
+future3 <- make_future_dataframe(m3, periods=30)
+forecast3 <- predict(m3,future)
+mape_IncreasePrior<-mape(filter(df,ds < as.Date("2017-01-01")+29 & ds>=as.Date("2017-01-01"))$y,tail(forecast3$yhat,29))
+```
 
+>     prophet(df_train, changepoint.prior.scale = 0.1)
+
+* MAPE for 30 day prediction (default changepoint prior=0.05) : `r mape30Day`
+* MAPE for 30 day prediction set changepoint prior to 0.1 : `r mape_IncreasePrior`
 
 Forecast Uncertainty
 ========================================================
@@ -203,36 +239,33 @@ holidays <- bind_rows(EoYholiday,SoYHoliday)
 
 
 ```
-Forecast with Holidays
+Forecast with Holidays (90 Days)
 ========================================================
 
+>     m <- prophet(df_train, holidays=holidays)
+>     forecast <- predict(m,future)
+>     prophet_plot_components(m, forecast)
 
-```{r predict with holidays, echo=TRUE, message=FALSE}
+
+```{r predict with holidays, include=FALSE}
 m2 <- prophet(df_train, holidays = holidays)
 forecast2 <- predict(m2, future2)
+```
+
+```{r}
 prophet_plot_components(m2, forecast2)
-
 ```
 
-Performance with Prophet
+Forecast with Holidays (90 Days)
 ========================================================
-```{r, echo=FALSE}
-mape <- function(y, yhat)
-  sum(abs(y-yhat))/sum(y)
-mape30Day<-mape(df$y[1:length(forecast$yhat)],forecast$yhat)
-mape90Day<-mape(df$y[1:length(forecast2$yhat)],forecast2$yhat)
 
+```{r}
+mape_holidays<-mape(filter(df,ds < as.Date("2017-01-01")+89 & ds>=as.Date("2017-01-01"))$y,tail(forecast2$yhat,89))
 ```
+* MAPE for 90 day prediction : `r mape90Day`
+* MAPE for 90 day prediction with holidays : `r mape_holidays`
 
-* MAPE for 30 day prediction: `r mape30Day`
-* MAPE for 90 day prediction: `r mape90Day`
-
-Performance with Prophet
-========================================================
-* Performance of Prophet versus other forecasting methods ^1^
-```{r, out.width = "600px"}
-knitr::include_graphics("ProphetPerformance.png")
-```
+I may have made it worse ¯\\_(ツ)_/¯
 
 Analyst in the loop
 ========================================================
@@ -242,6 +275,7 @@ prophet(df = df, growth = "linear", changepoints = NULL,
   seasonality.prior.scale = 10, changepoint.prior.scale = 0.05,
   holidays.prior.scale = 10, mcmc.samples = 0, interval.width = 0.8,
   uncertainty.samples = 1000, fit = TRUE)
+  
   
 - Capacities  a low or declining capacity can be used to adjust the forecast downward or even to produce negative growt e.g. df$cap <- 100 can be specified for every row and is therefore non-constant.
 
