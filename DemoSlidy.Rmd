@@ -154,6 +154,7 @@ mape90Day<-mape(filter(df,ds < as.Date("2017-01-01")+89 & ds>=as.Date("2017-01-0
 Performance with Prophet
 ========================================================
 * Performance of Prophet versus other forecasting methods ^1^
+  
 ```{r, out.width = "600px"}
 knitr::include_graphics("ProphetPerformance.png")
 ```
